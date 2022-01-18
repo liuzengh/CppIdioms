@@ -1,8 +1,10 @@
 ## CppIdioms
 
-### 编译和运行
+### 规范
 
-- C++17
+- [C++ Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines)
+- [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html)
+- [C++17](https://www.cppstd17.com/)
 - [Bazel编译工具](https://bazel.build/)
 
 ### Pimpl
