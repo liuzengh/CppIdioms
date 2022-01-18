@@ -34,7 +34,7 @@ Person::Person() : pimpl_(std::make_unique<Impl>()) {}
 
 #### Pimpl为什么能减少代码依赖和编译时间
 
-如果不使用Pimpl技巧来实现Person类的话，我们只需要把Person::Impl内的所有实现都放置在Person类中：
+如果不使用Pimpl技巧来实现Person类的话，我们需要把Person::Impl内的所有实现都放置在Person类中：
 
 ```cpp
 // 不使用Pimpl
@@ -52,7 +52,9 @@ class Person {
 };
 ```
 
-这种做法有两个弊端，一是包含进来的<string> 和 "basic_info.hpp"头文件会增加Person类的编译时间；二是Person类依赖于这些头文件，当这些头文件发生改变时Person类必须重新被编译，例如这里的个人信息类BasicInfo就有可能需要频繁变更。
+这种做法有两个弊端:
+1. 包含进来的<string> 和 "basic_info.hpp"头文件会增加Person类的编译时间；
+2. Person类依赖于这些头文件，当这些头文件发生改变时Person类必须重新被编译，例如这里的个人信息类BasicInfo就有可能需要频繁变更。
 
 #### 在源文件中定义特殊的成员函数，而不是在头文件由编译器自动合成。
 
