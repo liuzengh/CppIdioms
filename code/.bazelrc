@@ -1,0 +1,4 @@
+# CppIdioms Project's Bazel option defaults
+
+build --cxxopt='-std=c++17'
+build --color=yes
