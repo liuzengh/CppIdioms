@@ -6,6 +6,7 @@
 - [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html)
 - [C++17](https://www.cppstd17.com/)
 - [Bazel编译工具](https://bazel.build/)
+- [GoogleTest](https://github.com/google/googletest)
 
 ### Pimpl
 
@@ -22,3 +23,23 @@ EBCO(**E**mpty **B**ase **C**lass **O**ptimization)，是一种优化空基类�
 别名：EBO
 
 应用：[boost::compressed_pair](https://www.boost.org/doc/libs/1_47_0/libs/utility/compressed_pair.htm), std::vector和std::shared_ptr的allocator member
+
+#### CRTP
+
+CRTP(**C**uriously **R**ecurring **T**emplate **P**attern)，是一种实现静态多态的C++模板编程技巧。其基本做法是将派生类作为模板参数传递给它自己的基类：
+
+```cpp
+// CRTP idioms
+template <class Derived>
+class Base {
+};
+class Derived : public Base<Derived> {
+    // ...
+};
+template<typename T>
+class DerivedTemplate : public Base<DerivedTemplate<T>> {
+   // ...
+};
+```
+
+应用：[侵入式双链表butil::LinkedList](https://github.com/apache/incubator-brpc/blob/master/src/butil/containers/linked_list.h)，[enable_shared_from_this](https://en.cppreference.com/w/cpp/memory/enable_shared_from_this)和[c++20:ranges::view_interface](https://en.cppreference.com/w/cpp/ranges/view_interface)
