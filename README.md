@@ -43,3 +43,19 @@ class DerivedTemplate : public Base<DerivedTemplate<T>> {
 ```
 
 应用：[侵入式双链表butil::LinkedList](https://github.com/apache/incubator-brpc/blob/master/src/butil/containers/linked_list.h)，[enable_shared_from_this](https://en.cppreference.com/w/cpp/memory/enable_shared_from_this)和[c++20:ranges::view_interface](https://en.cppreference.com/w/cpp/ranges/view_interface)
+
+
+#### Mixin
+
+Mixin(**M**ix in) 是一种将若干功能独立的类通过继承的方式实现模块复用的C++模板编程技巧。其基本做法是将模板参数作为派生类的基类:
+
+```c++
+template<typename... Mixins>
+class MixinClass : public Mixins... {
+  public:
+    MixinClass() :  Mixins...() {}
+  // ...
+};
+```
+
+应用：[std::nested_exception](https://en.cppreference.com/w/cpp/error/nested_exception)
