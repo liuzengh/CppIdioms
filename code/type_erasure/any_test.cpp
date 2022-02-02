@@ -12,11 +12,11 @@ struct Pod {
 };
 
 int main() {
-  Any a;
-  Any b = 4.3;
+  cpp_idioms::Any a;
+  cpp_idioms::Any b = 4.3;
   std::cout << "b.Type():" << b.Type().name() << std::endl;
   if (b.Type() == typeid(double)) {
-    auto d = (AnyCast<double>(b));
+    auto d = (cpp_idioms::AnyCast<double>(b));
     std::cout << "d:" << d << std::endl;
   };
 

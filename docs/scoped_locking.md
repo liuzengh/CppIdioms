@@ -59,7 +59,7 @@ class ScopedLock<> {
 
 #### 表达式折叠
 
-ScopedLock在析构函数中需要对每个mutex解锁，可以用表达式折叠来展开：(ms.unlock(), ...); std::scoped_lock的做法是使用初始化列表，然后在无用的数组变量上加上__attribute__((__unused__))来避免警告。
+ScopedLock在析构函数中需要对每个mutex解锁，可以用表达式折叠来展开：(ms.unlock(), ...); std::scoped_lock的做法是使用初始化列表，然后在无用的数组变量上加上`__attribute__((__unused__))`来避免警告, c++17之后建议使用`[[maybe_unused]]`属性。
 
 ```cpp
 ~ScopedLock() {

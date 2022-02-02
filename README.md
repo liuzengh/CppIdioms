@@ -70,3 +70,17 @@ Scoped Locking 是将RAII手法应用于locking的并发编程技巧。其具体
 - std::scoped_lock (c++17): 多个std::mutex(或std::shared_mutex)
 
 应用：std::lock_guard, std::unique_lock, std::shared_lock 和 std::scoped_lock
+
+
+#### Type Erasure
+
+Type Erasure 是一种对不同类型使用单一的运行时表示，但只会根据各自声明的类型使用它们的编程技术。
+
+
+> Variants of the technique of using a single run-time representation for values of a number of
+types and relying on the (static) type system to ensure that they are used only according to their
+declared type has been called *type erasure* - Bjarne Stroustrup `<<The C++ Programming Language 4ed>>`
+
+也就是说，Type Erasure对不同类型进行了高级抽象，实现了某种统一表示，但是又保留了实际类型的行为和数据。我们知道C++、Java都是强类型语言，所有的变量在声明的时候一旦被指定成了某个具体的数据类型，如果不经过强制转换就永远就是这种类型了。与强类型相对应的是类似于Python这样的弱类型语言，允许不同类型之间进行自由转换。
+
+应用: std::any 和 std::function

@@ -12,6 +12,8 @@
 //   return static_cast<std::underlying_type_t<E>>(enumerator);
 // }
 
+namespace cpp_idioms {
+
 class BadAnyCast : public std::bad_cast {
  public:
   virtual const char* what() const noexcept override { return "bad any_cast"; }
@@ -439,3 +441,5 @@ void Any::ManagerExternal<Tp>::Manage(Operator which, const Any* any,
       break;
   }
 }
+
+}  // namespace cpp_idioms
