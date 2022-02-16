@@ -7,7 +7,7 @@ Type Erasure 是一种对不同类型使用单一的运行时表示，但只会�
 types and relying on the (static) type system to ensure that they are used only according to their
 declared type has been called *type erasure* - Bjarne Stroustrup `<<The C++ Programming Language 4ed>>`
 
-也就是说，Type Erasure对不同类型进行了高级抽象，实现了某种统一表示，但是又保留了实际类型的行为和数据。我们知道C++、Java都是强类型语言，所有的变量在声明的时候一旦被指定成了某个具体的数据类型，如果不经过强制转换就永远就是这种类型了。与强类型相对应的是类似于Python这样的弱类型语言，允许不同类型之间进行自由转换。不过我们可以用C++17引入的std::any来改变变量的内部类型，且保证仍然是类型安全的：
+也就是说，Type Erasure对不同类型进行了高级抽象，实现了某种统一表示，但是又保留了实际类型的行为和数据。我们知道C++、Java都是静态类型语言，所有的变量在声明的时候一旦被指定成了某个具体的数据类型，如果不经过强制转换就永远就是这种类型了。与静态类型相对应的是类似于Python这样的动态类型语言，允许不同类型之间进行自由转换。不过我们可以用C++17引入的std::any来改变变量的内部类型，且保证仍然是类型安全的：
 
 ```cpp
 std::any a;             // a is empty
@@ -27,7 +27,6 @@ if (a.type() == typeid(std::string)) {
 我们不免会想一下std::any和std::function的内部实现，在C语言中可以空指针`void*`来表示类型的任意数据，用函数指针来表示类型的任意行为，最后都是pointer! 实际上C++中的Type Erasure的所有实现都是这样的。下面以Any(std::any)为例子来简要分析下。
 
 ### Any的实现
-
 
 **内部数据表示与小对象优化**
 
@@ -124,6 +123,13 @@ class Any {
   struct ManagerExternal {
     static void Manage(Operator which, const Any* any_ptr, Arg* arg);
   };
+ private:
+  enum class Operator { kAccess, KGetTypeInfo, kClone, kDestroy, kXfer };
+  union Arg {
+    void* obj;
+    const std::type_info* typeinfo_ptr;
+    Any* any_ptr;
+  };
 };
 ```
 
@@ -191,10 +197,159 @@ manager_的行为会在拷贝构造函数、移动构造函数，拷贝赋值，
 
 ### std::function的实现
 
-先占个坑，下回补齐.
+std:: function<> 实际上是c++函数指针的通用形式，提供相同的基本操作:
+
+- 可以在调用者不知道函数体的情况下，调用函数
+- 可复制、可移动和可赋值
+- 能够被其他函数（或兼容形式）初始化或赋值
+- 存在空状态来表明当前没有与之绑定的函数
+
+但是，与c++函数指针不同，std::function<> 可以存储lambda表达式或函数对象。
+
+接下来我们将构建通用函数指针类模板FunctionPtr，以提供上述相同的核心操作和功能，并可用于替代std::function（本实现参考自`<<C++ Templates The Complete Guide 2ed>>`一书中的FunctionPtr。）:
+
+
+```cpp
+// function_ptr.hpp
+
+template <typename Signature>
+class FunctionPtr;
+
+template <typename R, typename... Args>
+class FunctionPtr<R(Args...)> {
+ public:
+  FunctionPtr() : bridge_{nullptr} {}
+
+  FunctionPtr(const FunctionPtr&);
+
+  FunctionPtr(FunctionPtr& other)
+      : FunctionPtr(static_cast<FunctionPtr const&>(other)) {}
+  FunctionPtr(FunctionPtr&& other) : bridge_{other.bridge_} {
+    other.bridge_ = nullptr;
+  }
+
+  template <typename F>
+  FunctionPtr(F&& f);
+
+  FunctionPtr& operator=(const FunctionPtr& other) {
+    FunctionPtr temp(other);
+    swap(*this, temp);
+    return *this;
+  }
+
+  FunctionPtr& operator=(FunctionPtr&& other) {
+    delete bridge_;
+    bridge_ = other.bridge_;
+    other.bridge_ = nullptr;
+    return *this;
+  }
+
+  template <typename F>
+  FunctionPtr& operator=(F&& f) {
+    FunctionPtr temp(std::forward<F>(f));
+    swap(*this, temp);
+    return *this;
+  }
+
+  ~FunctionPtr() { delete bridge_; }
+
+  friend void swap(FunctionPtr& fp1, FunctionPtr& fp2) {
+    std::swap(fp1.bridge_, fp2.bridge_);
+  }
+
+  explicit operator bool() const { return bridge_ == nullptr; }
+
+  R operator()(Args... args) const;
+
+ private:
+  FunctorBridge<R, Args...>* bridge_;
+};
+```
+
+FunctionPtr包含一个非静态成员变量bridge_，负责函数对象的存储和操作。该指针的所有权绑定到FunctionPtr对象，因此所提供的大多数接口仅仅管理该指针。
+
+#### 动态多态： Bridge Interface
+
+FunctorBridge类模板负责底层函数对象的所有权和操作。它被实现为一个抽象基类，保证了FunctionPtr的动态多态性:
+
+```cpp
+// function_bridge.hpp
+
+template <typename R, typename... Args>
+class FunctorBridge {
+ public:
+  virtual ~FunctorBridge() {}
+  virtual FunctorBridge* Clone() const = 0;
+  virtual R Invoke(Args... arg) const = 0;
+  virtual bool Equals(const FunctorBridge* fb) const = 0;
+};
+```
+
+使用这些虚函数，可以实现FunctionPtr的复制构造函数和函数调用操作符:
+
+```cpp
+// function_ptr.hpp
+template <typename R, typename... Args>
+FunctionPtr<R(Args...)>::FunctionPtr(const FunctionPtr& other)
+    : bridge_{nullptr} {
+  if (other.bridge_) {
+    bridge_ = other.bridge_->Clone();
+  }
+}
+
+template <typename R, typename... Args>
+R FunctionPtr<R(Args...)>::operator()(Args... args) const {
+  return bridge_->Invoke(std::forward<Args>(args)...);
+}
+```
+
+### 静态多态：SpecificFunctorBridge
+
+FunctorBridge的每个实例都是一个抽象类，因此它的派生类负责实现其虚函数。为了支持各种类型的函数对象，我们需要定义许多派生类，不过幸运的是，这里可以通过将派生类存储的函数对象的类型进行参数化来实现这一点：
+
+
+```cpp
+// specific_functor_bridge.hpp
+template <typename Functor, typename R, typename... Args>
+class SpecificFunctorBridge : public FunctorBridge<R, Args...> {
+ public:
+  template <typename FunctorFwd>
+  SpecificFunctorBridge(FunctorFwd&& functor)
+      : functor_(std::forward<FunctorFwd>(functor)) {}
+
+  virtual SpecificFunctorBridge* Clone() const override {
+    return new SpecificFunctorBridge(functor_);
+  }
+
+  virtual R Invoke(Args... args) const override {
+    return functor_(std::forward<Args>(args)...);
+  }
+
+ private:
+  Functor functor_;
+};
+```
+
+SpecificFunctorBridge的每个实例都存储了函数对象(其类型为Functor)的一个副本，它可以被调用、复制(通过克隆SpecificFunctorBridge)或销毁(隐式地在析构函数中)。每当FunctionPtr被初始化为一个新的函数对象时，就会创建SpecificFunctorBridge实例:
+
+```cpp
+// function_ptr.hpp
+template <typename R, typename... Args>
+template <typename F>
+FunctionPtr<R(Args...)>::FunctionPtr(F&& f) : bridge_{nullptr} {
+  using Functor = std::decay_t<F>;
+  using Bridge = SpecificFunctorBridge<Functor, R, Args...>;
+  bridge_ = new Bridge(std::forward<F>(f));
+}
+```
+
+需要注意的是，虽然FunctionPtr构造函数本身是在函数对象类型F上模板化的，但该类型只有通过SpecificFunctorBridge(由Bridge类型别名描述)的特定特化才能知道。一旦新分配的Bridge实例被分配给数据成员Bridge，由于从Bridge 到`FunctorBridge<R, Args…>`这种类型信息的丢失解释了为什么Type Erasure通常用于描述静态和动态多态性之间的桥接技术。
+
+Type Erasure提供了静态多态和动态多态的一些优点，但不是全部。特别是，使用Type Erasure生成的代码的性能更接近于动态多态性，因为两者都通过虚拟函数使用动态dispatch。因此，静态多态性的一些传统优势，比如编译器内联调用的能力，可能会丧失。这种性能损失是否可察觉取决于应用程序，但通常很容易通过考虑相对于虚函数调用的代价，在被调用的函数中执行了多少工作来判断:如果两者接近(例如，使用FunctionPtr简单地添加两个整数)，Type Erasure可能比静态多态版本执行得慢得多；如果函数调用执行大量的工作—查询数据库、对容器排序或更新用户界面，则Type Erasure的开销不太可能测量。
 
 ### 参考
 
-Chapter17 std::any  Nicolai M. Josuttis `C++17 the Complete Guide`
-Chapter25 Specialization. Bjarne Stroustrup  `<<The C++ Programming Language 4ed>>`
-[stackoverflow: Type erasure techniques](https://stackoverflow.com/questions/5450159/type-erasure-techniques)
+1. Chapter17 std::any.  Nicolai M. Josuttis `<<C++17 the Complete Guide>>`
+2. Chapter22: Bridging static and dynamic Polymorphism.  David Vandevoorde, Nicolai M. Josuttis, Douglas Gregor `<<C++ Templates The Complete Guide 2ed>>`
+3. Chapter25 Specialization. Bjarne Stroustrup  `<<The C++ Programming Language 4ed>>`
+4. [stackoverflow: Type erasure techniques](https://stackoverflow.com/questions/5450159/type-erasure-techniques)

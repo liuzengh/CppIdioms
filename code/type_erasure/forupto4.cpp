@@ -3,7 +3,7 @@
 #include <iostream>
 #include <vector>
 
-#include "functionptr.hpp"
+#include "function_ptr.hpp"
 
 void ForUpTo(int n, FunctionPtr<void(int)> f) {
   for (int i = 0; i < n; ++i) {
