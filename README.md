@@ -53,7 +53,7 @@ Mixin(**M**ix in) 是一种将若干功能独立的类通过继承的方式实�
 template<typename... Mixins>
 class MixinClass : public Mixins... {
   public:
-    MixinClass() :  Mixins...() {}
+    MixinClass() :  Mixins()... {}
   // ...
 };
 ```
